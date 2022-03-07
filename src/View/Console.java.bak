@@ -1,0 +1,126 @@
+package View;
+
+import Controller.Controller;
+import Model.Exceptions.InterpreterException;
+import Model.Exceptions.ListException;
+import Model.PrgState;
+import Model.adt.IList;
+import Model.adt.MyDict;
+import Model.adt.MyList;
+import Model.adt.MyStack;
+import Model.exp.ArithExp;
+import Model.exp.ValueExp;
+import Model.exp.VarExp;
+import Model.stmt.*;
+import Model.types.BoolType;
+import Model.types.IntType;
+import Model.types.StringType;
+import Model.value.BoolValue;
+import Model.value.IntValue;
+import Model.value.StringValue;
+import Repo.IRepo;
+
+import java.util.Scanner;
+
+
+public class Console {
+    static String ORANGE = "\33[34m";
+    static String YELLOW = "\33[33m";
+    static String GREEN = "\33[32m";
+    static String BLUE = "\33[35m";
+    static String END = "\33[0m";
+    Controller controller;
+
+    public Console(Controller controller) {
+        this.controller = controller;
+    }
+
+    public static void displayMenu() {
+        System.out.println();
+        System.out.println(GREEN + "run " + END + "[" + BLUE + "-a" + END + "|" + BLUE + "-o" + END + "] number - Execute a program (a = all, o = one)");
+        System.out.println(GREEN + "list " + END + "[" + BLUE + "-s" + END + "|" + BLUE + "-f" + END + "] number - List the programs (s = statement, f = full)");
+        System.out.println("exit - Exit the interpreter.");
+    }
+
+    public void run() {
+        Scanner scan = new Scanner(System.in);
+        System.out.println("Welcome to the Toy Language Interpreter!");
+        System.out.print("Please input the log file path\n>>");
+        String logFilePath = scan.nextLine();
+        controller.setLogFilePath(logFilePath);
+        addPrograms();
+        while (true) {
+            try {
+                displayMenu();
+                System.out.print(GREEN + "input>>" + END);
+                String input = scan.nextLine();
+                int program = input.charAt(input.length() - 1) - '0';
+                if (input.matches("^run -o [0-3]"))
+                    controller.execOneStep(program);
+                else if (input.matches("^run -a [0-3]"))
+                    controller.execAllStep(program);
+                else if (input.equals("list -s"))
+                    printStatements();
+                else if (input.equals("list -f"))
+                    printFull();
+                else if (input.equals("exit"))
+                    break;
+                else
+                    System.out.println("Invalid input!");
+            } catch (InterpreterException e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+
+    private void printStatements() throws ListException {
+        IList<PrgState> statements = controller.getStates();
+        for (int i = 0; i < statements.size(); i++) {
+            System.out.println(i + ". " + statements.get(i).getOriginalProgram());
+        }
+    }
+
+    private void printFull() throws ListException {
+        IList<PrgState> statements = controller.getStates();
+        for (int i = 0; i < statements.size(); i++) {
+            System.out.println(i + ". " + statements.get(i));
+        }
+    }
+
+    public void addPrograms() {
+        IStmt stmt1 = new CompStmt(new VarDeclStmt("v", new IntType()),
+                new CompStmt(new AssignStmt("v", new ValueExp(new IntValue(2))),
+                        new PrintStmt(new VarExp("v"))));
+        IStmt stmt2 = new CompStmt(new VarDeclStmt("a", new IntType()), new CompStmt(new VarDeclStmt("b", new IntType()),
+                new CompStmt(new AssignStmt("a", new ArithExp('+', new ValueExp(new IntValue(2)), new ArithExp('*',
+                        new ValueExp(new IntValue(3)), new ValueExp(new IntValue(5))))), new CompStmt(
+                        new AssignStmt("b", new ArithExp('+', new VarExp("a"), new ValueExp(new IntValue(1)))),
+                        new PrintStmt(new VarExp("b"))))));
+        IStmt stmt3 = new CompStmt(new VarDeclStmt("a", new BoolType()), new CompStmt(new VarDeclStmt("v",
+                new IntType()), new CompStmt(new AssignStmt("a", new ValueExp(new BoolValue(true))),
+                new CompStmt(new IfStmt(new VarExp("a"), new AssignStmt("v", new ValueExp(new IntValue(2))),
+                        new AssignStmt("v", new ValueExp(new IntValue(3)))), new PrintStmt(new
+                        VarExp("v"))))));
+
+        IStmt stmt4 = new CompStmt(new VarDeclStmt("varf", new StringType()),
+                new CompStmt(new AssignStmt("varf", new ValueExp(new StringValue("test.in"))),
+                        new CompStmt(new openRFile(new VarExp("varf")),
+                                new CompStmt(new VarDeclStmt("varc", new IntType()),
+                                        new CompStmt(new readFile(new VarExp("varf"), "varc"),
+                                                new CompStmt(new PrintStmt(new VarExp("varc")),
+                                                        new CompStmt(new readFile(new VarExp("varf"), "varc"),
+                                                                new CompStmt(new PrintStmt(new VarExp("varc")), new closeFile(new VarExp("varf"))))))))));
+        //IStmt stmt4 = new CompStmt(new CompStmt(new CompStmt(new CompStmt(new CompStmt(new CompStmt(new CompStmt(new CompStmt(new VarDeclStmt("varf", new StringType()), new AssignStmt("varf", new VarExp("test.in"))), new openRFile(new VarExp("varf"))), new VarDeclStmt("varc", new IntType())), new readFile(new VarExp("varf"), "varc")), new PrintStmt(new VarExp("varc"))), new readFile(new VarExp("varf"), "varc")), new PrintStmt(new VarExp("varc"))), new closeFile(new VarExp("varf")));
+
+        PrgState state1 = new PrgState(new MyStack<>(), new MyDict<>(), new MyList<>(), new MyDict<>(), stmt1);
+        PrgState state2 = new PrgState(new MyStack<>(), new MyDict<>(), new MyList<>(), new MyDict<>(), stmt2);
+        PrgState state3 = new PrgState(new MyStack<>(), new MyDict<>(), new MyList<>(), new MyDict<>(), stmt3);
+        PrgState state4 = new PrgState(new MyStack<>(), new MyDict<>(), new MyList<>(), new MyDict<>(), stmt4);
+
+        controller.addProgram(state1);
+        controller.addProgram(state2);
+        controller.addProgram(state3);
+        controller.addProgram(state4);
+    }
+
+}
